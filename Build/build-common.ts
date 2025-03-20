@@ -9,7 +9,8 @@ import { SHARED_DESCRIPTION } from './constants/description';
 import { fdir as Fdir } from 'fdir';
 import { appendArrayInPlace } from './lib/append-array-in-place';
 import { SOURCE_DIR } from './constants/dir';
-import { DomainsetOutput, RulesetOutput } from './lib/create-file';
+import { DomainsetOutput } from './lib/rules/domainset';
+import { RulesetOutput } from './lib/rules/ruleset';
 
 const MAGIC_COMMAND_SKIP = '# $ custom_build_script';
 const MAGIC_COMMAND_TITLE = '# $ meta_title ';
@@ -23,7 +24,7 @@ const clawSourceDirPromise = new Fdir()
 
     const extname = path.extname(filepath);
 
-    return !(extname === '.js' || extname === '.ts');
+    return extname !== '.js' && extname !== '.ts';
   })
   .crawl(SOURCE_DIR)
   .withPromise();
@@ -103,7 +104,7 @@ async function transform(parentSpan: Span, sourcePath: string, relativePath: str
   return parentSpan
     .traceChild(`transform ruleset: ${id}`)
     .traceAsyncFn(async (span) => {
-      const type = relativePath.split(path.sep)[0];
+      const type = relativePath.slice(0, relativePath.indexOf(path.sep));
 
       if (type !== 'ip' && type !== 'non_ip' && type !== 'domainset') {
         throw new TypeError(`Invalid type: ${type}`);
@@ -112,7 +113,7 @@ async function transform(parentSpan: Span, sourcePath: string, relativePath: str
       const res = await processFile(span, sourcePath);
       if (res === $skip) return;
 
-      const [title, descriptions, lines, sgmodulePathname] = res;
+      const [title, descriptions, lines, sgmoduleName] = res;
 
       let finalDescriptions: string[];
       if (descriptions.length) {
@@ -134,7 +135,7 @@ async function transform(parentSpan: Span, sourcePath: string, relativePath: str
       return new RulesetOutput(span, id, type)
         .withTitle(title)
         .withDescription(finalDescriptions)
-        .withMitmSgmodulePath(sgmodulePathname)
+        .withMitmSgmodulePath(sgmoduleName)
         .addFromRuleset(lines)
         .write();
     });

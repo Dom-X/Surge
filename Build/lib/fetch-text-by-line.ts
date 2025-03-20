@@ -1,9 +1,7 @@
 import fs from 'node:fs';
-import fsp from 'node:fs/promises';
-import type { FileHandle } from 'node:fs/promises';
 import readline from 'node:readline';
 
-import { TextLineStream } from './text-line-transform-stream';
+import { TextLineStream } from 'foxts/text-line-stream';
 import type { ReadableStream } from 'node:stream/web';
 import { TextDecoderStream } from 'node:stream/web';
 import { processLine, ProcessLineStream } from './process-line';
@@ -17,11 +15,6 @@ export function readFileByLine(file: string): AsyncIterable<string> {
     input: fs.createReadStream(file/* , { encoding: 'utf-8' } */),
     crlfDelay: Infinity
   });
-}
-
-const fdReadLines = (fd: FileHandle) => fd.readLines();
-export async function readFileByLineNew(file: string): Promise<AsyncIterable<string>> {
-  return fsp.open(file, 'r').then(fdReadLines);
 }
 
 export const createReadlineInterfaceFromResponse: ((resp: UndiciResponseData | UnidiciWebResponse, processLine?: boolean) => ReadableStream<string>) = (resp, processLine = false) => {
@@ -38,7 +31,7 @@ export const createReadlineInterfaceFromResponse: ((resp: UndiciResponseData | U
 
   const resultStream = webStream
     .pipeThrough(new TextDecoderStream())
-    .pipeThrough(new TextLineStream());
+    .pipeThrough(new TextLineStream({ skipEmptyLines: processLine }));
 
   if (processLine) {
     return resultStream.pipeThrough(new ProcessLineStream());

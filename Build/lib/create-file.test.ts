@@ -2,11 +2,11 @@ import { expect } from 'expect';
 import { fileEqual } from './create-file';
 
 // eslint-disable-next-line @typescript-eslint/require-await -- async iterable
-const createSource = async function *(input: string[]) {
+async function *createSource(input: string[]) {
   for (const line of input) {
     yield line;
   }
-};
+}
 
 async function test(a: string[], b: string[], expected: boolean) {
   expect((await fileEqual(a, createSource(b)))).toBe(expected);
@@ -39,6 +39,12 @@ describe('fileEqual', () => {
     false
   ));
 
+  it('comment less', () => test(
+    ['# A', '# B', 'B'],
+    ['# A', 'B'],
+    false
+  ));
+
   it('larger', () => test(
     ['A', 'B'],
     ['A', 'B', 'C'],
@@ -51,9 +57,27 @@ describe('fileEqual', () => {
     false
   ));
 
-  it('eol', () => test(
+  it('eol more #1', () => test(
     ['A', 'B'],
     ['A', 'B', ''],
-    true
+    false
+  ));
+
+  it('eol more #2', () => test(
+    ['A', 'B', ''],
+    ['A', 'B', '', ''],
+    false
+  ));
+
+  it('eol less #1', () => test(
+    ['A', 'B', ''],
+    ['A', 'B'],
+    false
+  ));
+
+  it('eol less #2', () => test(
+    ['A', 'B', '', ''],
+    ['A', 'B', ''],
+    false
   ));
 });

@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+  pull_request:
   schedule:
     - cron: ""
 
@@ -16,7 +17,6 @@ jobs:
     runs-on: ubuntu-24.04-arm
 
     steps:
-      - run: df -h
       # - name: Tune GitHub-hosted runner network
       #   # https://github.com/actions/runner-images/issues/1187
       #   uses: smorimoto/tune-github-hosted-runner-network@v1
@@ -33,7 +33,7 @@ jobs:
       - name: Create RAM Disk for building
         id: ramdisk
         run: |
-          BUILD_DIR=$(mktemp -d -p /dev/shm/ -t sukka-surge-public.XXXXXXXXXX)
+          BUILD_DIR=$(mktemp -d -p "$TMPDIR" -t "sukka-surge-public.XXXXXXXXXX")
           echo "Build dir created at $BUILD_DIR"
           echo "build_dir=$BUILD_DIR" >> $GITHUB_OUTPUT
       - name: Download Previous Build
@@ -42,6 +42,7 @@ jobs:
           repository: SukkaLab/ruleset.skk.moe
           persist-credentials: false
           path: previous-build-${{ github.run_id }}-${{ github.run_number }}
+          token: ${{ secrets.GIT_TOKEN }}
       - name: Setup build folder
         run: |
           mv previous-build-${{ github.run_id }}-${{ github.run_number }}/{.,}* ${{ steps.ramdisk.outputs.build_dir }}/
@@ -104,7 +105,7 @@ jobs:
           echo "public directory is ready: ${{ steps.ramdisk.outputs.build_dir }}"
       - uses: actions/upload-artifact@v4
         with:
-          name: build-artifact-${{ github. ref_name }}
+          name: build-artifact-${{ github.sha }}-${{ github.run_number }}
           path: ${{ steps.ramdisk.outputs.build_dir }}
           if-no-files-found: error
           retention-days: 1
@@ -117,6 +118,26 @@ jobs:
           path: |
             .cache
           key: ${{ runner.os }}-v3-${{ steps.date.outputs.year }}-${{ steps.date.outputs.month }}-${{ steps.date.outputs.day }} ${{ steps.date.outputs.hour }}:${{ steps.date.outputs.minute }}:${{ steps.date.outputs.second }}
+  diff_deployment_on_pr:
+    if: github.ref != 'refs/heads/master'
+    needs:
+      - build
+    name: Diff output
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-artifact-${{ github.sha }}-${{ github.run_number }}
+          path: public
+      - name: Diff
+        run: |
+          git clone --filter=tree:0 --no-tags https://github.com/SukkaLab/ruleset.skk.moe.git ./deploy-git >/dev/null 2>&1
+          cd ./deploy-git
+          git fetch origin master >/dev/null 2>&1
+          rm -rf ./*
+          cp -rf ../public/* ./
+          git --no-pager diff --minimal
+
   deploy_to_cloudflare_pages:
     needs:
       - build
@@ -128,8 +149,7 @@ jobs:
         id: npm_cache_path
         shell: sh
         run: echo dir=$(npm config get cache) >> $GITHUB_OUTPUT
-      - name: Cache NPM cache
-        uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         with:
           path: |
             ${{ steps.npm_cache_path.outputs.dir }}
@@ -137,7 +157,7 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-deploy-to-cloudflare-npm
       - uses: actions/download-artifact@v4
         with:
-          name: build-artifact-${{ github.ref_name }}
+          name: build-artifact-${{ github.sha }}-${{ github.run_number }}
           path: public
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
@@ -145,7 +165,13 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy public --project-name=sukkaw-ruleset --commit-dirty=true --branch=main
-          wranglerVersion: '3.81.0'
+          wranglerVersion: '3.90.0'
+      - uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ steps.npm_cache_path.outputs.dir }}
+            node_modules
+          key: ${{ runner.os }}-${{ runner.arch }}-deploy-to-cloudflare-npm
   deploy_to_github_gitlab:
     needs:
       - build
@@ -155,14 +181,14 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: build-artifact-${{ github.ref_name }}
+          name: build-artifact-${{ github.sha }}-${{ github.run_number }}
           path: public
       - name: Upload Dist to GitLab
         continue-on-error: true
         run: |
           git clone --filter=tree:0 --no-tags https://${GITLAB_TOKEN_NAME}:${GITLAB_TOKEN}@gitlab.com/SukkaW/ruleset.skk.moe.git ./deploy-git
           cd ./deploy-git
-          git config --global push.default matching
+          git config --global push.dgefault matching
           git config --global user.email "${GITLAB_EMAIL}"
           git config --global user.name "${GITLAB_USER}"
           rm -rf ./*

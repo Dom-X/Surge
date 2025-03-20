@@ -1,20 +1,25 @@
 // @ts-check
 import path from 'node:path';
-import { createReadlineInterfaceFromResponse, readFileIntoProcessedArray } from './lib/fetch-text-by-line';
+import { readFileIntoProcessedArray } from './lib/fetch-text-by-line';
 import { task } from './trace';
 import { SHARED_DESCRIPTION } from './constants/description';
-import { RulesetOutput } from './lib/create-file';
-import { SOURCE_DIR } from './constants/dir';
-import { $$fetch } from './lib/fetch-retry';
+import { compareAndWriteFile } from './lib/create-file';
+import { OUTPUT_INTERNAL_DIR, SOURCE_DIR } from './constants/dir';
 import { fetchAssets } from './lib/fetch-assets';
 import { fastIpVersion } from './lib/misc';
+import { AUGUST_ASN, HUIZE_ASN } from '../Source/ip/badboy_asn';
+import { RulesetOutput } from './lib/rules/ruleset';
 
-const BOGUS_NXDOMAIN_URL = 'https://raw.githubusercontent.com/felixonmars/dnsmasq-china-list/master/bogus-nxdomain.china.conf';
-const getBogusNxDomainIPsPromise: Promise<[ipv4: string[], ipv6: string[]]> = $$fetch(BOGUS_NXDOMAIN_URL).then(async (resp) => {
+const getBogusNxDomainIPsPromise: Promise<[ipv4: string[], ipv6: string[]]> = fetchAssets(
+  'https://cdn.jsdelivr.net/gh/felixonmars/dnsmasq-china-list@master/bogus-nxdomain.china.conf',
+  ['https://raw.githubusercontent.com/felixonmars/dnsmasq-china-list/master/bogus-nxdomain.china.conf'],
+  true
+).then((arr) => {
   const ipv4: string[] = [];
   const ipv6: string[] = [];
 
-  for await (const line of createReadlineInterfaceFromResponse(resp, true)) {
+  for (let i = 0, len = arr.length; i < len; i++) {
+    const line = arr[i];
     if (line.startsWith('bogus-nxdomain=')) {
       const ip = line.slice(15).trim();
       const v = fastIpVersion(ip);
@@ -25,6 +30,7 @@ const getBogusNxDomainIPsPromise: Promise<[ipv4: string[], ipv6: string[]]> = $$
       }
     }
   }
+
   return [ipv4, ipv6] as const;
 });
 
@@ -55,21 +61,27 @@ export const buildRejectIPList = task(require.main === module, __filename)(async
     span.traceChildPromise('get botnet ips', getBotNetFilterIPsPromise)
   ]);
 
-  return new RulesetOutput(span, 'reject', 'ip')
-    .withTitle('Sukka\'s Ruleset - Anti Bogus Domain')
-    .withDescription([
-      ...SHARED_DESCRIPTION,
-      '',
-      'This file contains known addresses that are hijacking NXDOMAIN results returned by DNS servers, and botnet controller IPs.',
-      '',
-      'Data from:',
-      ' - https://github.com/felixonmars/dnsmasq-china-list',
-      ' - https://github.com/curbengh/botnet-filter'
-    ])
-    .addFromRuleset(readLocalRejectIpListPromise)
-    .bulkAddCIDR4NoResolve(bogusNxDomainIPs[0])
-    .bulkAddCIDR6NoResolve(bogusNxDomainIPs[1])
-    .bulkAddCIDR4NoResolve(botNetIPs[0])
-    .bulkAddCIDR6NoResolve(botNetIPs[1])
-    .write();
+  return Promise.all([
+    new RulesetOutput(span, 'reject', 'ip')
+      .withTitle('Sukka\'s Ruleset - Anti Bogus Domain')
+      .withDescription([
+        ...SHARED_DESCRIPTION,
+        '',
+        'This file contains known addresses that are hijacking NXDOMAIN results returned by DNS servers, and botnet controller IPs.',
+        '',
+        'Data from:',
+        ' - https://github.com/felixonmars/dnsmasq-china-list',
+        ' - https://github.com/curbengh/botnet-filter'
+      ])
+      .addFromRuleset(readLocalRejectIpListPromise)
+      .bulkAddCIDR4NoResolve(bogusNxDomainIPs[0])
+      .bulkAddCIDR6NoResolve(bogusNxDomainIPs[1])
+      .bulkAddCIDR4NoResolve(botNetIPs[0])
+      .bulkAddCIDR6NoResolve(botNetIPs[1])
+      .bulkAddIPASN(AUGUST_ASN)
+      .bulkAddIPASN(HUIZE_ASN)
+      .write(),
+    compareAndWriteFile(span, [AUGUST_ASN.join(' ')], path.join(OUTPUT_INTERNAL_DIR, 'august_asn.txt')),
+    compareAndWriteFile(span, [HUIZE_ASN.join(' ')], path.join(OUTPUT_INTERNAL_DIR, 'huize_asn.txt'))
+  ]);
 });

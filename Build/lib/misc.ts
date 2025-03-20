@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import type { PathLike } from 'node:fs';
 import fsp from 'node:fs/promises';
 
+export type MaybePromise<T> = T | Promise<T>;
+
 export function fastStringCompare(a: string, b: string) {
   const lenA = a.length;
   const lenB = b.length;
@@ -58,6 +60,17 @@ export function withBannerArray(title: string, description: string[] | readonly 
     ...content,
     '################## EOF ##################'
   ];
+};
+
+export function notSupported(name: string) {
+  return (...args: unknown[]) => {
+    console.error(`${name}: not supported.`, args);
+    throw new Error(`${name}: not implemented.`);
+  };
+}
+
+export function withIdentityContent(title: string, description: string[] | readonly string[], date: Date, content: string[]) {
+  return content;
 };
 
 export function isDirectoryEmptySync(path: PathLike) {

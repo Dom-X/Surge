@@ -2,7 +2,7 @@ import picocolors from 'picocolors';
 import { $$fetch, defaultRequestInit, ResponseError } from './fetch-retry';
 import { waitWithAbort } from 'foxts/wait';
 import { nullthrow } from 'foxts/guard';
-import { TextLineStream } from './text-line-transform-stream';
+import { TextLineStream } from 'foxts/text-line-stream';
 import { ProcessLineStream } from './process-line';
 
 // eslint-disable-next-line sukka/unicorn/custom-error-definition -- typescript is better
@@ -20,7 +20,7 @@ export async function fetchAssets(url: string, fallbackUrls: null | undefined | 
     if (index >= 0) {
     // Most assets can be downloaded within 250ms. To avoid wasting bandwidth, we will wait for 500ms before downloading from the fallback URL.
       try {
-        await waitWithAbort(50 + (index + 1) * 100, controller.signal);
+        await waitWithAbort(50 + (index + 1) * 150, controller.signal);
       } catch {
         console.log(picocolors.gray('[fetch cancelled early]'), picocolors.gray(url));
         throw reusedCustomAbortError;
@@ -32,7 +32,7 @@ export async function fetchAssets(url: string, fallbackUrls: null | undefined | 
     }
     const res = await $$fetch(url, { signal: controller.signal, ...defaultRequestInit });
 
-    let stream = nullthrow(res.body).pipeThrough(new TextDecoderStream()).pipeThrough(new TextLineStream());
+    let stream = nullthrow(res.body, url + ' has an empty body').pipeThrough(new TextDecoderStream()).pipeThrough(new TextLineStream({ skipEmptyLines: processLine }));
     if (processLine) {
       stream = stream.pipeThrough(new ProcessLineStream());
     }

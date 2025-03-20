@@ -1,7 +1,7 @@
 // @ts-check
 import path from 'node:path';
 import { DOMESTICS, DOH_BOOTSTRAP, AdGuardHomeDNSMapping } from '../Source/non_ip/domestic';
-import { DIRECTS, LAN } from '../Source/non_ip/direct';
+import { DIRECTS, HOSTS, LAN } from '../Source/non_ip/direct';
 import type { DNSMapping } from '../Source/non_ip/direct';
 import { readFileIntoProcessedArray } from './lib/fetch-text-by-line';
 import { compareAndWriteFile } from './lib/create-file';
@@ -11,7 +11,8 @@ import { createMemoizedPromise } from './lib/memo-promise';
 import * as yaml from 'yaml';
 import { appendArrayInPlace } from './lib/append-array-in-place';
 import { OUTPUT_INTERNAL_DIR, OUTPUT_MODULES_DIR, OUTPUT_MODULES_RULES_DIR, SOURCE_DIR } from './constants/dir';
-import { RulesetOutput } from './lib/create-file';
+import { RulesetOutput } from './lib/rules/ruleset';
+import { SurgeOnlyRulesetOutput } from './lib/rules/ruleset';
 
 export function createGetDnsMappingRule(allowWildcard: boolean) {
   const hasWildcard = (domain: string) => {
@@ -72,13 +73,18 @@ export const getDomesticAndDirectDomainsRulesetPromise = createMemoizedPromise(a
     appendArrayInPlace(directs, domains.flatMap(getDnsMappingRuleWithWildcard));
   });
 
+  // backward compatible, add lan.conf
+  Object.values(LAN).forEach(({ domains }) => {
+    appendArrayInPlace(lans, domains.flatMap(getDnsMappingRuleWithWildcard));
+  });
+
   return [domestics, directs, lans] as const;
 });
 
 export const buildDomesticRuleset = task(require.main === module, __filename)(async (span) => {
   const [domestics, directs, lans] = await getDomesticAndDirectDomainsRulesetPromise();
 
-  const dataset: Array<[name: string, DNSMapping]> = ([DOH_BOOTSTRAP, DOMESTICS, DIRECTS, LAN] as const).flatMap(Object.entries);
+  const dataset: Array<[name: string, DNSMapping]> = ([DOH_BOOTSTRAP, DOMESTICS, DIRECTS, LAN, HOSTS] as const).flatMap(Object.entries);
 
   return Promise.all([
     new RulesetOutput(span, 'domestic', 'non_ip')
@@ -114,12 +120,14 @@ export const buildDomesticRuleset = task(require.main === module, __filename)(as
         return;
       }
 
-      const output = new RulesetOutput(span, name.toLowerCase(), 'sukka_local_dns_mapping').withTitle(`Sukka's Ruleset - Local DNS Mapping (${name})`).withDescription([
-        ...SHARED_DESCRIPTION,
-        '',
-        'This is an internal rule that is only referenced by sukka_local_dns_mapping.sgmodule',
-        'Do not use this file in your Rule section, all rules are included in non_ip/domestic.conf already.'
-      ]);
+      const output = new SurgeOnlyRulesetOutput(span, name.toLowerCase(), 'sukka_local_dns_mapping', OUTPUT_MODULES_RULES_DIR)
+        .withTitle(`Sukka's Ruleset - Local DNS Mapping (${name})`)
+        .withDescription([
+          ...SHARED_DESCRIPTION,
+          '',
+          'This is an internal rule that is only referenced by sukka_local_dns_mapping.sgmodule',
+          'Do not use this file in your Rule section, all rules are included in non_ip/domestic.conf already.'
+        ]);
 
       domains.forEach((domain) => {
         switch (domain[0]) {
@@ -135,12 +143,7 @@ export const buildDomesticRuleset = task(require.main === module, __filename)(as
         }
       });
 
-      return output.write({
-        surge: true,
-        clash: false,
-        singbox: false,
-        surgeDir: OUTPUT_MODULES_RULES_DIR
-      });
+      return output.write();
     }),
 
     compareAndWriteFile(
@@ -195,16 +198,19 @@ export const buildDomesticRuleset = task(require.main === module, __filename)(as
         }>((acc, cur) => {
           const { domains, dns, ...rest } = cur[1];
           domains.forEach((domain) => {
-            let domainWildcard = domain;
-            if (domain[0] === '$') {
-              domainWildcard = domain.slice(1);
-            } else if (domain[0] === '+') {
-              domainWildcard = `*.${domain.slice(1)}`;
-            } else {
-              domainWildcard = `+.${domain}`;
+            switch (domain[0]) {
+              case '$':
+                domain = domain.slice(1);
+                break;
+              case '+':
+                domain = `*.${domain.slice(1)}`;
+                break;
+              default:
+                domain = `+.${domain}`;
+                break;
             }
 
-            acc.dns['nameserver-policy'][domainWildcard] = dns === 'system'
+            acc.dns['nameserver-policy'][domain] = dns === 'system'
               ? ['system://', 'system', 'dhcp://system']
               : dns;
           });
@@ -231,7 +237,7 @@ export const buildDomesticRuleset = task(require.main === module, __filename)(as
         'https://1.12.12.12/dns-query',
         'https://120.53.53.53/dns-query',
         '[//]udp://10.10.1.1:53',
-        ...(([DOMESTICS, DIRECTS, LAN] as const).flatMap(Object.values) as DNSMapping[]).flatMap(({ domains, dns: _dns }) => domains.flatMap((domain) => {
+        ...(([DOMESTICS, DIRECTS, LAN, HOSTS] as const).flatMap(Object.values) as DNSMapping[]).flatMap(({ domains, dns: _dns }) => domains.flatMap((domain) => {
           let dns;
           if (_dns in AdGuardHomeDNSMapping) {
             dns = AdGuardHomeDNSMapping[_dns as keyof typeof AdGuardHomeDNSMapping].join(' ');

@@ -26,6 +26,12 @@ if (!fs.existsSync(CACHE_DIR)) {
 const agent = new Agent({ allowH2: true });
 
 setGlobalDispatcher(agent.compose(
+  interceptors.dns({
+    // disable IPv6
+    dualStack: false,
+    affinity: 4
+    // TODO: proper cacheable-lookup, or even DoH
+  }),
   interceptors.retry({
     maxRetries: 5,
     minTimeout: 500, // The initial retry delay in milliseconds
@@ -35,6 +41,10 @@ setGlobalDispatcher(agent.compose(
     // This should be removed once https://github.com/nodejs/undici/issues/3728 is implemented
     retry(err, { state, opts }, cb) {
       const errorCode = 'code' in err ? (err as NodeJS.ErrnoException).code : undefined;
+
+      Object.defineProperty(err, '_url', {
+        value: opts.method + ' ' + opts.origin?.toString() + opts.path
+      });
 
       // Any code that is not a Undici's originated and allowed to retry
       if (
@@ -110,7 +120,8 @@ setGlobalDispatcher(agent.compose(
     store: new BetterSqlite3CacheStore({
       location: path.join(CACHE_DIR, 'undici-better-sqlite3-cache-store.db'),
       maxEntrySize: 1024 * 1024 * 100 // 100 MiB
-    })
+    }),
+    cacheByDefault: 180 // 3 minutes
   })
 ));
 
@@ -141,18 +152,18 @@ export class ResponseError<T extends UndiciResponseData | Response> extends Erro
 
 export const defaultRequestInit = {
   headers: {
-    'User-Agent': 'curl/8.9.1 (https://github.com/SukkaW/Surge)'
+    'User-Agent': 'curl/8.12.1 (https://github.com/SukkaW/Surge)'
   }
 };
 
-export async function $$fetch(url: string, init?: RequestInit) {
+export async function $$fetch(url: string, init: RequestInit = defaultRequestInit) {
   try {
     const res = await undici.fetch(url, init);
     if (res.status >= 400) {
       throw new ResponseError(res, url);
     }
 
-    if (!(res.status >= 200 && res.status <= 299) && res.status !== 304) {
+    if ((res.status < 200 || res.status > 299) && res.status !== 304) {
       throw new ResponseError(res, url);
     }
 
@@ -181,7 +192,7 @@ export async function requestWithLog(url: string, opt?: Parameters<typeof undici
       throw new ResponseError(res, url);
     }
 
-    if (!(res.statusCode >= 200 && res.statusCode <= 299) && res.statusCode !== 304) {
+    if ((res.statusCode < 200 || res.statusCode > 299) && res.statusCode !== 304) {
       throw new ResponseError(res, url);
     }
 
