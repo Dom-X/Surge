@@ -39,9 +39,14 @@ const dohServers: Array<[string, DNS2.DnsResolver]> = ([
   '1.1.1.1',
   '162.159.36.1',
   '162.159.46.1',
+  'dns.cloudflare.com', // Cloudflare DoH that uses different IPs
+  // one.one.one.one // Cloudflare DoH that uses 1.1.1.1 and 1.0.0.1
   '101.101.101.101', // TWNIC
   '185.222.222.222', // DNS.SB
   '45.11.45.11', // DNS.SB
+  'doh.dns.sb', // DNS.SB, Different PoPs w/ GeoDNS
+  // 'doh.sb', // DNS.SB xTom Anycast IP
+  // 'dns.sb', // DNS.SB use same xTom Anycast IP as doh.sb
   'dns10.quad9.net', // Quad9 unfiltered
   'doh.sandbox.opendns.com', // OpenDNS sandbox (unfiltered)
   'unfiltered.adguard-dns.com',
@@ -58,8 +63,8 @@ const dohServers: Array<[string, DNS2.DnsResolver]> = ([
   'puredns.org',
   // 'ordns.he.net',
   // 'dns.mullvad.net',
-  'basic.rethinkdns.com',
-  '198.54.117.10' // NameCheap DNS, supports DoT, DoH, UDP53
+  'basic.rethinkdns.com'
+  // '198.54.117.10' // NameCheap DNS, supports DoT, DoH, UDP53
   // 'ada.openbld.net',
   // 'dns.rabbitdns.org'
 ] as const).map(dns => [
@@ -163,18 +168,24 @@ export async function isDomainAlive(domain: string, isSuffix: boolean): Promise<
     aaaaDns.push(aaaaRecords.dns);
   }
 
-  // only then, let's test once with domesticDohServers
-  const aRecords = (await $resolve($domain, 'A', pickOne(domesticDohServers)));
-  if (aRecords.answers.length > 0) {
-    return onDomainAlive(domain);
+  // only then, let's test twice with domesticDohServers
+  for (let i = 0; i < 2; i++) {
+    // eslint-disable-next-line no-await-in-loop -- sequential
+    const aRecords = (await $resolve($domain, 'A', pickOne(domesticDohServers)));
+    if (aRecords.answers.length > 0) {
+      return onDomainAlive(domain);
+    }
+    aDns.push(aRecords.dns);
   }
-  aDns.push(aRecords.dns);
 
-  const aaaaRecords = (await $resolve($domain, 'AAAA', pickOne(domesticDohServers)));
-  if (aaaaRecords.answers.length > 0) {
-    return onDomainAlive(domain);
+  for (let i = 0; i < 2; i++) {
+    // eslint-disable-next-line no-await-in-loop -- sequential
+    const aaaaRecords = (await $resolve($domain, 'AAAA', pickOne(domesticDohServers)));
+    if (aaaaRecords.answers.length > 0) {
+      return onDomainAlive(domain);
+    }
+    aaaaDns.push(aaaaRecords.dns);
   }
-  aaaaDns.push(aaaaRecords.dns);
 
   console.log(picocolors.red('[domain dead]'), 'no A/AAAA records', { domain, a: aDns, aaaa: aaaaDns });
   return onDomainDead($domain);
@@ -255,7 +266,7 @@ const whoisNotFoundKeywordTest = createKeywordFilter([
   'no object found',
   'nothing found',
   'status: free',
-  'pendingdelete',
+  // 'pendingdelete',
   ' has been blocked by '
 ]);
 

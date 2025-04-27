@@ -3,18 +3,30 @@ export const DEBUG_DOMAIN_TO_FIND: string | null = null; // example.com | null
 type HostsSource = [main: string, mirrors: string[] | null, includeAllSubDomain: boolean];
 
 export const HOSTS: HostsSource[] = [
+  // WindowsSpyBlocker hasn't been updated since 2022-06-16, its content has been merged into domainset/reject.conf
+  // [
+  //   'https://cdn.jsdelivr.net/gh/crazy-max/WindowsSpyBlocker@master/data/hosts/spy.txt',
+  //   ['https://raw.githubusercontent.com/crazy-max/WindowsSpyBlocker/master/data/hosts/spy.txt'],
+  //   true
+  // ],
   [
-    // WindowsSpyBlocker hasn't been updated since 2022-06-16, let's use jsDelivr as primary URL
-    'https://cdn.jsdelivr.net/gh/crazy-max/WindowsSpyBlocker@master/data/hosts/spy.txt',
-    ['https://raw.githubusercontent.com/crazy-max/WindowsSpyBlocker/master/data/hosts/spy.txt'],
-    true
+    'https://cdn.jsdelivr.net/gh/jerryn70/GoodbyeAds@master/Extension/GoodbyeAds-Xiaomi-Extension.txt',
+    ['https://raw.githubusercontent.com/jerryn70/GoodbyeAds/master/Extension/GoodbyeAds-Xiaomi-Extension.txt'],
+    false
   ],
-  ['https://raw.githubusercontent.com/jerryn70/GoodbyeAds/master/Extension/GoodbyeAds-Xiaomi-Extension.txt', null, false],
-  ['https://raw.githubusercontent.com/jerryn70/GoodbyeAds/master/Extension/GoodbyeAds-Huawei-AdBlock.txt', null, false]
+  [
+    'https://cdn.jsdelivr.net/gh/jerryn70/GoodbyeAds@master/Extension/GoodbyeAds-Huawei-AdBlock.txt',
+    ['https://raw.githubusercontent.com/jerryn70/GoodbyeAds/master/Extension/GoodbyeAds-Huawei-AdBlock.txt'],
+    false
+  ],
+  [
+    'https://cdn.jsdelivr.net/gh/jerryn70/GoodbyeAds@master/Extension/GoodbyeAds-Samsung-AdBlock.txt',
+    ['https://raw.githubusercontent.com/jerryn70/GoodbyeAds/master/Extension/GoodbyeAds-Samsung-AdBlock.txt'],
+    false
+  ]
 ];
 
 export const HOSTS_EXTRA: HostsSource[] = [
-  ['https://raw.githubusercontent.com/durablenapkin/block/master/tvstream.txt', null, true],
   // This stupid hosts blocks t.co, so we determine that this is also bullshit, so it is extra
   [
     'https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext',
@@ -23,18 +35,23 @@ export const HOSTS_EXTRA: HostsSource[] = [
   ],
   // Dan Pollock's hosts file, 0.0.0.0 version is 30 KiB smaller
   [
-    'https://someonewhocares.org/hosts/zero/hosts',
-    ['https://proxy.cdn.skk.moe/https/someonewhocares.org/hosts/zero/hosts'],
+    'https://proxy.cdn.skk.moe/https/someonewhocares.org/hosts/zero/hosts',
+    ['https://someonewhocares.org/hosts/zero/hosts'],
     true
   ],
-  // ad-wars is not actively maintained since 2023.11, so we use jsDelivr as primary URL
-  [
-    'https://cdn.jsdelivr.net/gh/jdlingyu/ad-wars@master/hosts',
-    ['https://raw.githubusercontent.com/jdlingyu/ad-wars/master/hosts'],
-    false
-  ],
+  // ad-wars is not actively maintained since 2023.11 due to Tencent's Legal Notice
+  // All contents has been intergrated into the reject.conf file
+  // [
+  //   'https://cdn.jsdelivr.net/gh/jdlingyu/ad-wars@master/hosts',
+  //   ['https://raw.githubusercontent.com/jdlingyu/ad-wars/master/hosts'],
+  //   false
+  // ],
   // hoshsadiq adblock-nocoin-list extra
-  ['https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/hosts.txt', [], true]
+  [
+    'https://cdn.jsdelivr.net/gh/hoshsadiq/adblock-nocoin-list@master/hosts.txt',
+    ['https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/hosts.txt'],
+    true
+  ]
 ];
 
 export const DOMAIN_LISTS: HostsSource[] = [
@@ -119,16 +136,16 @@ export const DOMAIN_LISTS_EXTRA: HostsSource[] = [
       'https://curbengh.github.io/urlhaus-filter/urlhaus-filter-domains.txt'
     ],
     true
-  ],
-  // Spam404
-  // Not actively maintained, let's use jsDelivr as primary URL
-  [
-    'https://cdn.jsdelivr.net/gh/Spam404/lists@master/main-blacklist.txt',
-    [
-      'https://raw.githubusercontent.com/Spam404/lists/master/main-blacklist.txt'
-    ],
-    true
   ]
+  // Spam404
+  // Not actively maintained, let's consider it is dead
+  // [
+  //   'https://cdn.jsdelivr.net/gh/Spam404/lists@master/main-blacklist.txt',
+  //   [
+  //     'https://raw.githubusercontent.com/Spam404/lists/master/main-blacklist.txt'
+  //   ],
+  //   true
+  // ]
 ];
 
 export const PHISHING_HOSTS_EXTRA: HostsSource[] = [
@@ -269,7 +286,11 @@ export const ADGUARD_FILTERS_EXTRA: AdGuardFilterSource[] = [
     ]
   ],
   // no coin list adguard list is more maintained than its hosts
-  ['https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/nocoin.txt', [], true],
+  [
+    'https://cdn.jsdelivr.net/gh/hoshsadiq/adblock-nocoin-list@master/nocoin.txt',
+    ['https://raw.githubusercontent.com/hoshsadiq/adblock-nocoin-list/master/nocoin.txt'],
+    true
+  ],
   // AdGuard Annoyances filter
   [
     'https://filters.adtidy.org/extension/ublock/filters/14_optimized.txt',
@@ -493,7 +514,6 @@ export const PREDEFINED_WHITELIST = [
   'ab.chatgpt.com', // EasyPrivacy blocks this
   'jnn-pa.googleapis.com', // ad-wars
   'imasdk.googleapis.com', // ad-wars
-  '.l.qq.com', // ad-wars
   '.in-addr.arpa', // rDNS
   '.ip6.arpa', // rDNS
   '.clients.your-server.de', // rDNS .static.183.213.201.138.clients.your-server.de
@@ -509,13 +529,16 @@ export const PREDEFINED_WHITELIST = [
   '.ib.snssdk.com', // AdGuard Tracking Protection -- breaks 今日头条专业版
   '.nstool.netease.com', // it is only used to check local dns
   '.wns.windows.com', // Windows Push Notifications. Besides there is no point in adding these
-  '.lon.llnw.net', // There is no point in adding these, many subdomains are dead anyway
-  '.lcy.llnw.net', // There is no point in adding these, many subdomains are dead anyway
+
+  '.llnw.net', // entire llnm.net has dead
+
   'repo.huaweicloud.com', // urlhaus
   '.hubspotlinks.com', // Peter Lowe Hosts
   'cldup.com', // OSINT
   'cuty.io', // short domain like bitly, blocked by phishing army
   'links.strava.com', // AdGuard CNAME Clickthrough Filters
+  'email.strava.com', // EasyList
+  'insideruser.microsoft.com', // WindowsSpyBlocker
 
   // Doesn't make sense: CNAME domains
   '.cdn.cloudflare.net',

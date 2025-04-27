@@ -19,19 +19,25 @@ describe('fileEqual', () => {
     true
   ));
 
-  it('ignore comment', async () => {
+  it('ignore comment 1', async () => {
     await test(
       ['# A', 'B'],
       ['# B', 'B'],
       true
     );
-
-    await test(
-      ['# A', '# C', 'B'],
-      ['# A', '# D', 'B'],
-      true
-    );
   });
+
+  it('ignore comment 2', () => test(
+    ['# A', '# C', 'B'],
+    ['# A', '# D', 'B'],
+    true
+  ));
+
+  it('ignore comment 3', () => test(
+    ['# A', '# C', 'B'],
+    ['# A', '# D', 'A'],
+    false
+  ));
 
   it('comment more', () => test(
     ['# A', 'B'],
@@ -79,5 +85,11 @@ describe('fileEqual', () => {
     ['A', 'B', '', ''],
     ['A', 'B', ''],
     false
+  ));
+
+  it('sgmodule', () => test(
+    ['#!name=[Sukka] URL Redirect', '#!desc=Last Updated: 2025-04-21T13:01:42.570Z Size: 127', '', 'always-real-ip'],
+    ['#!name=[Sukka] URL Redirect', '#!desc=Last Updated: 2025-04-20T13:01:42.570Z Size: 130', '', 'always-real-ip'],
+    true
   ));
 });
